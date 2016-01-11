@@ -1,0 +1,11 @@
+<RCC>
+    <qresource prefix="/images">
+        <file>Images/Add.ico</file>
+        <file>Images/continueIcon.png</file>
+        <file>Images/examine.png</file>
+        <file>Images/Subtract.png</file>
+        <file>Images/saveImage.png</file>
+        <file>Images/scan.png</file>
+        <file>Images/AZ_Sort.jpg</file>
+    </qresource>
+</RCC>
