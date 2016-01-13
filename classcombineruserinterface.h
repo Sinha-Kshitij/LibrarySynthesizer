@@ -24,8 +24,48 @@
 #include <QFile>
 #include <QTableWidget>
 #include <QTableView>
+#include <QDialog>
 #include <QHeaderView>
+#include <QInputDialog>
+#include <QStatusBar>
 
+class HeaderAndSourceTypesDialog : public QDialog
+{
+    Q_OBJECT
+
+    public:
+        HeaderAndSourceTypesDialog();
+
+    public slots:
+        void hideOrOpen(bool ignore);
+        void open(QVector<QString> headerTypes, QVector<QString> sourceTypes);
+
+    private:
+        QGridLayout *layout;
+
+        QListWidget *headerTypesWidget;
+        QPushButton *addHeaderTypes;
+        QPushButton *removeHeaderTypes;
+
+        QListWidget *sourceTypesWidget;
+        QPushButton *addSourceTypes;
+        QPushButton *removeSourceType;
+
+        QPushButton *accept;
+        bool status;
+
+        void closeEvent(QCloseEvent *ev);
+
+    private slots:
+        void addHeaderTypesFunction(bool ignore);
+        void addSourceTypesFunction(bool ignore);
+        void removeHeaderTypesFunction(bool ignore);
+        void removeSourceTypesFunction(bool ignore);
+
+    signals:
+        void updateTypes(QVector<QString> headerTypes, QVector<QString> sourceTypes);
+
+};
 
 class ClassCombinerUserInterface : public QWidget
 {
@@ -83,7 +123,8 @@ class ClassCombinerUserInterface : public QWidget
 
 
         // Part 6 Functions - Analyze and Combine
-        void synthesize();
+        void analyzeAll(bool ignore);
+        void synthesize(bool ignore);
         // Analyzes file, seeking out all include statements, the relevant information withint the file
         // and attempts to find all other dependencies the file has
         void analyzeFile(QString fileInput, int indexWithinStructure);
@@ -91,6 +132,13 @@ class ClassCombinerUserInterface : public QWidget
         QString analyzeIncludeStatement(QString text);
         // Finds whether the file dependencies are local
         void findFileDependencies(int index);
+
+        // UI stuff
+        void openDialog(bool ignore);
+        void themeFunction(bool ignore);
+        void refreshFunction(bool ignore);
+        void updateTypes(QVector<QString> headersTypesInput, QVector<QString> sourceTypesInput);
+        void setState(int state);
 
     private:
         // Part 1 - Folder and files adder
@@ -135,20 +183,23 @@ class ClassCombinerUserInterface : public QWidget
         QPushButton *assignDependencyButton; // Switches the current item at assignedDependency to top of assigned dependency
         QPushButton *addDependencyButton; // Adds to assignedDependency
 
-
         // Part 5 - Structural Decomposer
         QGroupBox *structuralDecomposerBox;
         QGridLayout *structuralBoxLayout;
-
+        QPushButton *refreshButton;
 
         // Part 6 - Analyze And Combine
         QGroupBox *primaryBox;
         QGridLayout *primaryBoxLayout;
         QPushButton *analyzeButton;
         QPushButton *synthesizeButton;
+        QPushButton *settingsButton;
+        QPushButton *themeButton;
+        HeaderAndSourceTypesDialog *headerAndSourceTypesDialog;
 
         // Overall layout
         QGridLayout *classCombinerUserInterfaceLayout;
+        QLineEdit *statusBar;
 
         // Private variables
         QVector<QString> informationOfFiles; // Contains the absolute file location
@@ -167,8 +218,9 @@ class ClassCombinerUserInterface : public QWidget
         QVector<QString> headerTypes;
         QVector<QString> sourceTypes;
 
+        // State
+        int stateVariable;
 };
-
 
 #endif // CLASSCOMBINERUSERINTERFACE
 
