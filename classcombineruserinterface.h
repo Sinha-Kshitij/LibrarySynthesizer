@@ -29,18 +29,23 @@
 #include <QInputDialog>
 #include <QStatusBar>
 
+// Dialog Box that allows for the modification of the definitions of headers and sources
 class HeaderAndSourceTypesDialog : public QDialog
 {
     Q_OBJECT
 
     public:
+        // Constructor
         HeaderAndSourceTypesDialog();
 
     public slots:
+        // Approriately opens and closes and transfers data to the main class
         void hideOrOpen(bool ignore);
+        // Modifies vectors to the current definitions of headers and sources
         void open(QVector<QString> headerTypes, QVector<QString> sourceTypes);
 
     private:
+        // Elements necessary to create the UI
         QGridLayout *layout;
 
         QListWidget *headerTypesWidget;
@@ -52,106 +57,115 @@ class HeaderAndSourceTypesDialog : public QDialog
         QPushButton *removeSourceType;
 
         QPushButton *accept;
+        QPushButton *reject;
+        bool emitInformation;
         bool status;
 
+        // Overrides close event to be in conjunction with function "hideOrOpen"
         void closeEvent(QCloseEvent *ev);
 
     private slots:
+        // Add header/source using a dialog box
         void addHeaderTypesFunction(bool ignore);
         void addSourceTypesFunction(bool ignore);
+        // Remove the currently selected approriate header/source definition
         void removeHeaderTypesFunction(bool ignore);
         void removeSourceTypesFunction(bool ignore);
+        // Ensure that changes made to header/source definitions are not transmitted
+        void rejectFunction(bool ignore);
 
     signals:
+        // Update the definition types to the main program
         void updateTypes(QVector<QString> headerTypes, QVector<QString> sourceTypes);
-
 };
 
+// Combines the UI and the main functions of the synthesizer
 class ClassCombinerUserInterface : public QWidget
 {
     Q_OBJECT
 
     public:
+        // Instantiate the user interface, connect the functions to the UI and ensure initial state is correct
         ClassCombinerUserInterface();
 
     private slots:
         // Part 1 Functions - Determine Source Materials
-        void addFile(bool ignore);
-        void addFile(QString file);
-        void addFileUI(QString file);
-        void removeFile(bool ignore);
-        void addFolder(bool ignore);
-        bool addFolder(QString folderToAdd);
-        void addFolderUI(QString folder);
-        void removeFolder(bool ignore);
-        bool checkForDegeneracy(QString file);
-        bool checkForFolderDegeneracy(QString folder);
-        bool checkForHeaderType(QString text);
-        bool checkForSourceType(QString text);
+        void addFile(bool ignore); // Add the file to be analyzed and synthesized. Only addresses the UI.
+        void addFile(QString file); // Adds the file to the internal data structure taking into account degeneracy of the data
+        void addFileUI(QString file); // Adds the file purely to the UI accounting for current file type and according to the current display name type
+        void removeFile(bool ignore); // Remvoe the file. Only addresses UI
+        void addFolder(bool ignore); // Analyze the folder (potentially recursively) for files relevant for synthesis. Only addresses th UI.
+        bool addFolder(QString folderToAdd); // Add the folder to be analyzed with files relevant for synthesis. Addresses the internal data structure
+        void addFolderUI(QString folder); // Focuses on the UI associated with the list widget, approriate display type, and sorting.
+        void removeFolder(bool ignore); // Remove the folder from the UI and internal data structure
+        bool checkForDegeneracy(QString file); // Checks for repetition of data structure within the internal structure
+        bool checkForFolderDegeneracy(QString folder); // Checks for repetition of data within the internal folder structure
+        bool checkForHeaderType(QString text); // Checks whether the file is of type header in accordance with definitions
+        bool checkForSourceType(QString text); // Checks whether the file is of type sources in accordance with definitions
 
-        void recursiveSearch(QString sourceFolder);
-        void findAllHeadersAndSourcesLocally(QString folderNameInput);
-        QString shortName(QString text);
+        void recursiveSearch(QString sourceFolder); // Searches recursively through the folders looking for headers and sources
+        void findAllHeadersAndSourcesLocally(QString folderNameInput); // Finds the headers and sources in the local directory
+        QString shortName(QString text); // Processes the full name of a file location, resulting in the local directory name of the file
 
-        void filterChanged(QString text);
-        void sortFolders(bool ignore);
-        void sortFiles(bool ignore);
-        void folderNameDisplay(QString text);
-        void filesNameDisplay(QString text);
+        void filterChanged(QString text); // Changes the filter to either display the header and source types
+        void sortFolders(bool ignore); // Sorts the folders alphabetically
+        void sortFiles(bool ignore); // Sorts the current files displayed alphabetically
+        void folderNameDisplay(QString text); // Modifies the display type of the folders
+        void filesNameDisplay(QString text); // Modifies the display type of the files
 
         // Part 2 Functions - Select Output Files
-        void selectHeaderFile(bool ignore);
-        void selectSourceFile(bool ignore);
+        void selectHeaderFile(bool ignore); // Selects the header file for output
+        void selectSourceFile(bool ignore); // Selects the source file for output
 
         // Part 3 Functions - File information Display
-        void fileTypeSelectorFunction(QString text); // ?
-        void fileSelectorFunction(QString text); // ?
+        void fileTypeSelectorFunction(QString text); // Lists the file type whose dependencies are to be inspected
+        void fileSelectorFunction(QString text); // Lists the dependencies of the current files
 
         // Part 4 Functions
-        void dependencyDisplay(QString text); // Used by "dependencyListType"
-        void dependencySolutionList(QString text); // Lists the dependencies as desired
-        void assignDependency(bool ignore); // Switches the structure of the items
-        void addDependencyFunction(bool ignore);
+        void dependencyDisplay(QString text); // Used by "dependencyListType"  to display the dependencies of either the current file, or according to solution type
+        void dependencySolutionList(QString text); // Lists the dependencies and solutions
+        void assignDependency(bool ignore); // Assigns the current dependency proposed solution as the solution for current dependency
+        void addDependencyFunction(bool ignore); // Adds a solution beyond the current scope of potential solutions as the dependency solution for the dependency in question!
 
         // Ensures all structures are in place
         // Combines UI from 1, 2, 3, 4
+        // Ensures the internal structure is coherent when files are added. Also analyzes files for dependencies and source information
+        // And adds unique dependencies as approriate
         void ensureStructuralCoherence();
-        void ensureStructuralCoherence(int indexOfRemoval);
-
+        void ensureStructuralCoherence(int indexOfRemoval); // Ensures the internal structure is coherent when files are removed
 
         // Part 5 Functions - Structure Display
 
 
         // Part 6 Functions - Analyze and Combine
-        void analyzeAll(bool ignore);
-        void synthesize(bool ignore);
+        void analyzeAll(bool ignore); // Analyzes all files for dependencies
+        void synthesize(bool ignore); // Combines all the files in accordance with dependency structure
         // Analyzes file, seeking out all include statements, the relevant information withint the file
-        // and attempts to find all other dependencies the file has
+        // and attempts to find all other dependencies the file has.
+        // Analyzes the files for dependencies, source and source information.
         void analyzeFile(QString fileInput, int indexWithinStructure);
-        // Analyzes include statement
-        QString analyzeIncludeStatement(QString text);
+        QString analyzeIncludeStatement(QString text); // Analyzes include statement
         // Finds whether the file dependencies are local
         void findFileDependencies(int index);
 
         // UI stuff
-        void openDialog(bool ignore);
-        void themeFunction(bool ignore);
-        void refreshFunction(bool ignore);
-        void updateTypes(QVector<QString> headersTypesInput, QVector<QString> sourceTypesInput);
-        void setState(int state);
+        void openDialog(bool ignore); // Opens the dialog for manipulation of header and source types definition
+        QStringList convertVectorToList(QVector<QString> dataToBeConverted); // Converts data from QVector to QStringList form
+        void themeFunction(bool ignore); // Opens the dialog box for theme definition
+        void refreshFunction(bool ignore); // Refreshed the function, setting state to initial state
+        void updateTypes(QVector<QString> headersTypesInput, QVector<QString> sourceTypesInput); // updates the data according to header/source type definition
+        void setState(int state); // Sets the state of the UI approriately
 
     private:
         // Part 1 - Folder and files adder
         QGroupBox *folderAndFileLocationsBox;
         QGridLayout *folderAndFileLocationsBoxLayout;
-
         QListWidget *foldersToCombine;
         QPushButton *folderAdderButton;
         QPushButton *folderRemoverButton;
         QCheckBox *activateRecursiveSearch;
         QPushButton *sortFolderButton;
         QComboBox *folderNameForm;
-
         QListWidget *filesToCombine;
         QPushButton *fileAdderButton;
         QPushButton *fileRemoverButton;
@@ -202,21 +216,27 @@ class ClassCombinerUserInterface : public QWidget
         QLineEdit *statusBar;
 
         // Private variables
+        // The following 5 internal structures are coherent
         QVector<QString> informationOfFiles; // Contains the absolute file location
+        QVector<int> structureWeight; // Contains the structural dependency of the files. Lower numbers represent less inter-dependencies
+        QVector<QVector<QString>> dependenciesOfFiles; // Contains the dependency of a file
+        QVector<QVector<bool>> stateOfDependenciesOfFiles; // Contains whether the dependencies of the files are resolved
+        QVector<QString> informationContainedWithinFiles; // Contains the source information of files independent of dependencies
+
+        // The following 2 internal structure are coherent. One contains the dependencies, the other the solution
+        QVector<QString> uniqueDependencies; // Contains the list of unique dependencies
+        QVector<QVector<QString>> dependencyFillingList; // Contains the list of potential solutions for a given dependency. Aligned with uniqueDependency
+
+        // The following internal structures contain the headers, sources, and folder types. These are not related directly to synthesis of the data.
         QVector<QString> informationOfHeaderFiles; // Contains the absolute file location of all headers
         QVector<QString> informationOfSourceFiles; // Contains the sbsolute file location of all sources
         QVector<QString> informationOfFolders; // Contains the location of all folders used
 
-        QVector<QVector<QString>> dependenciesOfFiles; // Contains the dependency of a file
-        QVector<QVector<bool>> stateOfDependenciesOfFiles;
-        QVector<QString> informationContainedWithinFiles;
-        QVector<int> structureWeight;
-
-        QVector<QString> uniqueDependencies;
-        QVector<QVector<QString>> dependencyFillingList;
-
-        QVector<QString> headerTypes;
-        QVector<QString> sourceTypes;
+        // The following 2 contain the definitions of headers and sources
+        QVector<QString> headerTypes; // Contains the type of definitions of header types
+        QVector<QString> sourceTypes; // Contains the type of definitions of source types
+        QStringList headerTypesList; // Contains header types in list form
+        QStringList sourceTypesList; // Contains source types in list form
 
         // State
         int stateVariable;

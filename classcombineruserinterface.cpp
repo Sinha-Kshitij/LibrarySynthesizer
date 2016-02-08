@@ -303,25 +303,32 @@ void ClassCombinerUserInterface::removeFile(bool ignore)
         currentlySelected = informationOfFiles.indexOf(textRemoved);
     }
 
-    informationOfFiles.remove(currentlySelected);
-    ensureStructuralCoherence(currentlySelected);
+    if(currentlySelected >= 0 && textRemoved.length() > 0)
+    {
+        informationOfFiles.remove(currentlySelected);
+        ensureStructuralCoherence(currentlySelected);
 
-    if(checkForHeaderType(textRemoved))
-    {
-        informationOfHeaderFiles.remove(informationOfHeaderFiles.indexOf(textRemoved));
-    }
-    else if(checkForSourceType(textRemoved))
-    {
-        informationOfSourceFiles.remove(informationOfSourceFiles.indexOf(textRemoved));
-    }
+        if(checkForHeaderType(textRemoved))
+        {
+            informationOfHeaderFiles.remove(informationOfHeaderFiles.indexOf(textRemoved));
+        }
+        else if(checkForSourceType(textRemoved))
+        {
+            informationOfSourceFiles.remove(informationOfSourceFiles.indexOf(textRemoved));
+        }
 
-    if(informationOfFiles.length() == 0)
-    {
-        setState(0);
-    }
-    else
-    {
-        setState(1);
+        if(informationOfFiles.length() == 0)
+        {
+            setState(0);
+        }
+        else
+        {
+            setState(1);
+        }
+
+        // Reload the UI in all locations
+        filterChanged(fileTypeFilter->currentText());
+        fileTypeSelectorFunction(fileTypeSelector->currentText());
     }
 }
 void ClassCombinerUserInterface::addFolder(bool ignore)
@@ -329,7 +336,7 @@ void ClassCombinerUserInterface::addFolder(bool ignore)
     ignore;
     QString folderToAdd = QFileDialog::getExistingDirectory(this, tr("Open Directory for Header/Source Files"), "/home", QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
 
-    if(checkForFolderDegeneracy(folderToAdd))
+    if(folderToAdd.length() > 0 && checkForFolderDegeneracy(folderToAdd))
     {
         if(activateRecursiveSearch->isChecked())
         {
@@ -579,13 +586,20 @@ void ClassCombinerUserInterface::selectSourceFile(bool ignore)
 void ClassCombinerUserInterface::fileTypeSelectorFunction(QString text)
 {
     int index = 0;
+    QVector<QString> sortedFiles;
     if(text == "Headers")
     {
         fileSelector->clear();
 
         for(index = 0; index < informationOfHeaderFiles.length(); index++)
         {
-            fileSelector->addItem(shortName(informationOfHeaderFiles.at(index)));
+            sortedFiles.append(shortName(informationOfHeaderFiles.at(index)));
+        }
+        qSort(sortedFiles);
+        // Add the sorted files
+        for(index = 0; index < sortedFiles.length(); index++)
+        {
+            fileSelector->addItem(sortedFiles.at(index));
         }
     }
     else if(text == "Sources")
@@ -594,7 +608,13 @@ void ClassCombinerUserInterface::fileTypeSelectorFunction(QString text)
 
         for(index = 0; index < informationOfSourceFiles.length(); index++)
         {
-            fileSelector->addItem(shortName(informationOfSourceFiles.at(index)));
+            sortedFiles.append(shortName(informationOfSourceFiles.at(index)));
+        }
+        qSort(sortedFiles);
+        // Add the sorted files
+        for(index = 0; index < sortedFiles.length(); index++)
+        {
+            fileSelector->addItem(sortedFiles.at(index));
         }
     }
 }
@@ -647,7 +667,10 @@ void ClassCombinerUserInterface::fileSelectorFunction(QString text)
         if(qobject_cast<QLineEdit*>(informationDisplayTable->cellWidget(index, 1)) != NULL)
         {
             //std::cout << "Table text - " << row << "," << column << " - " << replacementText << std::endl;
-            //qobject_cast<QLineEdit*>(informationDisplayTable->cellWidget(index, 1))->setText(dependencyFillingList.at(indexOfDependency).at(0));
+            if(dependencyFillingList.at(indexOfDependency).length() > 0)
+            {
+                qobject_cast<QLineEdit*>(informationDisplayTable->cellWidget(index, 1))->setText(dependencyFillingList.at(indexOfDependency).at(0));
+            }
         }
     }
 
@@ -806,6 +829,20 @@ void ClassCombinerUserInterface::updateTypes(QVector<QString> headersTypesInput,
         sourceTypes.append(sourceTypesInput.at(index));
     }
 }
+
+QStringList ClassCombinerUserInterface::convertVectorToList(QVector<QString> dataToBeConverted)
+{
+    QStringList result;
+    int index = 0;
+
+    for(index = 0; index < dataToBeConverted.length(); index++)
+    {
+        result.append(dataToBeConverted.at(index));
+    }
+
+    return result;
+}
+
 void ClassCombinerUserInterface::themeFunction(bool ignore)
 {
     ignore;
@@ -885,9 +922,10 @@ void ClassCombinerUserInterface::setState(int state)
 void ClassCombinerUserInterface::findAllHeadersAndSourcesLocally(QString folderNameInput)
 {
     QDir folderToAnalyze(folderNameInput);
+    QStringList stringList = convertVectorToList(headerTypes);
     if(folderToAnalyze.isReadable())
     {
-        QFileInfoList filesOfConcern = folderToAnalyze.entryInfoList(QStringList() << "*.h");
+        QFileInfoList filesOfConcern = folderToAnalyze.entryInfoList();
 
         QString location = "";
         int index = 0;
@@ -897,12 +935,13 @@ void ClassCombinerUserInterface::findAllHeadersAndSourcesLocally(QString folderN
             addFile(location);
         }
 
-        filesOfConcern = folderToAnalyze.entryInfoList(QStringList() << "*.cpp");
+        stringList = convertVectorToList(sourceTypes);
+        filesOfConcern = folderToAnalyze.entryInfoList(stringList);
         for(index = 0; index < filesOfConcern.length(); index++)
         {
             location = filesOfConcern.at(index).absoluteFilePath();
             addFile(location);
-    }
+        }
     }
 
     // Set the UI to be correct
@@ -963,7 +1002,6 @@ void ClassCombinerUserInterface::analyzeFile(QString fileInput, int indexWithinS
             if(QString(lineAnalysis.at(index)).contains("#include", Qt::CaseInsensitive) && QString(lineAnalysis.at(index)).startsWith('#'))
             {
                 //std::cout << "Line " << index << " - " << lineAnalysis.at(index).toStdString() << std::endl;
-
                 //std::cout << analyzeIncludeStatement(QString(lineAnalysis.at(index))).toStdString() << std::endl;
                 (dependenciesOfFiles[indexWithinStructure]).append(analyzeIncludeStatement(QString(lineAnalysis.at(index))));
                 (stateOfDependenciesOfFiles[indexWithinStructure]).append(false);
@@ -1126,6 +1164,7 @@ HeaderAndSourceTypesDialog::HeaderAndSourceTypesDialog()
 {
     layout = new QGridLayout;
     status = false;
+    emitInformation = false;
 
     headerTypesWidget = new QListWidget;
     addHeaderTypes = new QPushButton;
@@ -1147,6 +1186,10 @@ HeaderAndSourceTypesDialog::HeaderAndSourceTypesDialog()
     accept->setText("Accept");
     connect(accept, SIGNAL(clicked(bool)), this, SLOT(hideOrOpen(bool)));
 
+    reject = new QPushButton;
+    reject->setText("Reject");
+    connect(reject, SIGNAL(clicked(bool)), this, SLOT(rejectFunction(bool)));
+
     // Set layout
     layout->addWidget(new QLabel("Headers"), 0, 0, 1, 3, Qt::AlignCenter);
     layout->addWidget(headerTypesWidget, 1, 0, 4, 3);
@@ -1156,7 +1199,8 @@ HeaderAndSourceTypesDialog::HeaderAndSourceTypesDialog()
     layout->addWidget(sourceTypesWidget, 1, 3, 4, 3);
     layout->addWidget(addSourceTypes, 5, 4, 1, 1);
     layout->addWidget(removeSourceType, 5, 5, 1, 1);
-    layout->addWidget(accept, 6, 4, 1, 2);
+    layout->addWidget(accept, 6, 4, 1, 1);
+    layout->addWidget(reject, 6, 5, 1, 1);
 
     this->setModal(true);
     this->setLayout(layout);
@@ -1177,29 +1221,38 @@ void HeaderAndSourceTypesDialog::hideOrOpen(bool ignore)
         this->setVisible(false);
         this->hide();
 
-        // Setup the vectors
-        QVector<QString> headerTypes;
-        QVector<QString> sourceTypes;
-        int index = 0;
-        for(index = 0; index < headerTypesWidget->count(); index++)
+        if(emitInformation)
         {
-            headerTypes.append(headerTypesWidget->item(index)->text());
-        }
-        for(index = 0; index < sourceTypesWidget->count(); index++)
-        {
-            sourceTypes.append(sourceTypesWidget->item(index)->text());
-        }
+            // Setup the vectors
+            QVector<QString> headerTypes;
+            QVector<QString> sourceTypes;
+            int index = 0;
+            for(index = 0; index < headerTypesWidget->count(); index++)
+            {
+                headerTypes.append(headerTypesWidget->item(index)->text());
+            }
+            for(index = 0; index < sourceTypesWidget->count(); index++)
+            {
+                sourceTypes.append(sourceTypesWidget->item(index)->text());
+            }
 
-        emit updateTypes(headerTypes, sourceTypes);
-
+            emit updateTypes(headerTypes, sourceTypes);
+        }
     }
     else
     {
         status = true;
         this->setVisible(true);
         this->show();
+        emitInformation = true;
     }
 }
+void HeaderAndSourceTypesDialog::rejectFunction(bool ignore)
+{
+    emitInformation = false;
+    hideOrOpen(false);
+}
+
 void HeaderAndSourceTypesDialog::open(QVector<QString> headerTypes, QVector<QString> sourceTypes)
 {
     headerTypesWidget->clear();
