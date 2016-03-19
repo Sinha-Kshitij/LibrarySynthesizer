@@ -26,7 +26,6 @@ ClassCombinerUserInterface::ClassCombinerUserInterface()
     folderNameForm->addItem("Long");
     folderNameForm->addItem("Short");
     connect(folderNameForm, SIGNAL(currentTextChanged(QString)), this, SLOT(folderNameDisplay(QString)));
-    connect(folderNameForm, SIGNAL(currentTextChanged(QString)), this, SLOT(folderNameDisplay(QString)));
     folderAndFileLocationsBoxLayout->addWidget(new QLabel("Folders"), 0, 0, 1, 1);
     folderAndFileLocationsBoxLayout->addWidget(folderRemoverButton, 0, 2, 1, 1);
     folderAndFileLocationsBoxLayout->addWidget(folderAdderButton, 0, 3, 1, 1);
@@ -97,6 +96,7 @@ ClassCombinerUserInterface::ClassCombinerUserInterface()
     fileTypeSelector = new QComboBox;
     fileTypeSelector->addItem("Headers");
     fileTypeSelector->addItem("Sources");
+    fileTypeSelector->addItem("Entry Points");
     connect(fileTypeSelector, SIGNAL(currentTextChanged(QString)), this, SLOT(fileTypeSelectorFunction(QString)));
     fileSelector = new QComboBox;
     connect(fileSelector, SIGNAL(currentTextChanged(QString)), this, SLOT(fileSelectorFunction(QString)));
@@ -129,13 +129,22 @@ ClassCombinerUserInterface::ClassCombinerUserInterface()
     addDependencyButton->setIcon(QIcon(":/images/Images/Add.ico"));
     connect(addDependencyButton, SIGNAL(clicked(bool)), this, SLOT(addDependencyFunction(bool)));
     assignedDependency = new QComboBox;
+    connect(assignedDependency, SIGNAL(currentTextChanged(QString)), this, SLOT(assignedDependencyFunction(QString)));
+    assignedDependencyLineEdit = new QLineEdit;
+    assignedDependencyLineEdit->setReadOnly(true);
+    removeDependencyButton = new QPushButton;
+    removeDependencyButton->setIcon(QIcon(":/images/Images/Subtract.png"));
+    connect(removeDependencyButton, SIGNAL(clicked(bool)), this, SLOT(removeSolutionsFunction(bool)));
     dependencyAssignmentLayout->addWidget(new QLabel("List Type"), 0, 0, 1, 1);
     dependencyAssignmentLayout->addWidget(dependencyListType, 0, 1, 1, 2);
     dependencyAssignmentLayout->addWidget(new QLabel("Dependency"), 1, 0, 1, 1);
     dependencyAssignmentLayout->addWidget(listOfDependencies, 1, 1, 1, 2);
-    dependencyAssignmentLayout->addWidget(assignedDependency, 2, 0, 1, 1);
-    dependencyAssignmentLayout->addWidget(assignDependencyButton, 2, 1, 1, 1);
-    dependencyAssignmentLayout->addWidget(addDependencyButton, 2, 2, 1, 1);
+    dependencyAssignmentLayout->addWidget(new QLabel("Assigned Dependency"), 2, 0, 1, 1);
+    dependencyAssignmentLayout->addWidget(assignedDependency, 2, 1, 1, 2);
+    dependencyAssignmentLayout->addWidget(assignedDependencyLineEdit, 3, 0, 1, 3);
+    dependencyAssignmentLayout->addWidget(assignDependencyButton, 4, 0, 1, 1);
+    dependencyAssignmentLayout->addWidget(addDependencyButton, 4, 1, 1, 1);
+    dependencyAssignmentLayout->addWidget(removeDependencyButton, 4, 2, 1, 1);
     dependencyAssignmentBox->setLayout(dependencyAssignmentLayout);
 
     // ***** Part 5 - The structure of the system can be viewed *****
@@ -144,7 +153,6 @@ ClassCombinerUserInterface::ClassCombinerUserInterface()
     structuralBoxLayout = new QGridLayout;
 
     structuralDecomposerBox->setLayout(structuralBoxLayout);
-
 
     // ***** Part 6 - Analyze And Combine *****
     primaryBox = new QGroupBox;
@@ -193,6 +201,9 @@ ClassCombinerUserInterface::ClassCombinerUserInterface()
     // Initialize the program
     stateVariable = -1;
     setState(0);
+    idealState = 0;
+
+    mainFilesAndDefinition.clear();
 }
 
 // ***** Part 1 Functions
@@ -247,6 +258,7 @@ void ClassCombinerUserInterface::addFile(QString file)
             ensureStructuralCoherence();
             addFileUI(file);
 
+            idealState = 1;
             setState(1);
         }
     }
@@ -319,10 +331,12 @@ void ClassCombinerUserInterface::removeFile(bool ignore)
 
         if(informationOfFiles.length() == 0)
         {
+            idealState = 0;
             setState(0);
         }
         else
         {
+            idealState = 1;
             setState(1);
         }
 
@@ -355,16 +369,8 @@ bool ClassCombinerUserInterface::addFolder(QString folderToAdd)
     {
         if(checkForFolderDegeneracy(folderToAdd))
         {
-            if(folderNameForm->currentText() == "Long")
-            {
-                foldersToCombine->addItem(folderToAdd);
-            }
-            else if(folderNameForm->currentText() == "Short")
-            {
-                foldersToCombine->addItem(shortName(folderToAdd));
-            }
-
             informationOfFolders.append(folderToAdd);
+            addFolderUI(folderToAdd);
             result = true;
         }
     }
@@ -390,7 +396,24 @@ void ClassCombinerUserInterface::removeFolder(bool ignore)
     {
         textRemoved = foldersToCombine->takeItem(currentlySelected)->text();
     }
-
+    
+    if(folderNameForm->currentText() == "Short")
+    {
+        for(int index = 0; index < informationOfFolders.length(); index++)
+        {
+            if(informationOfFolders.at(index).endsWith(textRemoved, Qt::CaseInsensitive))
+            {
+                currentlySelected = index;
+                break;
+            }
+        }
+    }
+    else
+    {
+        currentlySelected = informationOfFolders.indexOf(textRemoved);
+    }
+    
+    informationOfFolders.remove(currentlySelected);
 }
 bool ClassCombinerUserInterface::checkForDegeneracy(QString file)
 {
@@ -551,7 +574,11 @@ void ClassCombinerUserInterface::selectHeaderFile(bool ignore)
     filter += ");; All Files (*.*)";
 
     QString fileForSavingHeader = QFileDialog::getSaveFileName(this, tr("Resulting Header File For Synthesis"), "/home", filter);
-    outputHeaderFile->setText(fileForSavingHeader);
+
+    if(checkForHeaderType(fileForSavingHeader))
+    {
+        outputHeaderFile->setText(fileForSavingHeader);
+    }
 }
 void ClassCombinerUserInterface::selectSourceFile(bool ignore)
 {
@@ -578,8 +605,12 @@ void ClassCombinerUserInterface::selectSourceFile(bool ignore)
     }
     filter += ");; All Files (*.*)";
 
-    QString fileForSavingHeader = QFileDialog::getSaveFileName(this, tr("Resulting Source File For Synthesis"), "/home", filter);
-    outputSourceFile->setText(fileForSavingHeader);
+    QString fileForSavingSource = QFileDialog::getSaveFileName(this, tr("Resulting Source File For Synthesis"), "/home", filter);
+
+    if(checkForSourceType(fileForSavingSource))
+    {
+        outputSourceFile->setText(fileForSavingSource);
+    }
 }
 
 // ***** Part 3 Functions
@@ -617,69 +648,97 @@ void ClassCombinerUserInterface::fileTypeSelectorFunction(QString text)
             fileSelector->addItem(sortedFiles.at(index));
         }
     }
+    else if(text == "Entry Points")
+    {
+        fileSelector->clear();
+
+        for(index = 0; index < mainFilesAndDefinition.length(); index++)
+        {
+            sortedFiles.append(shortName(mainFilesAndDefinition.at(index).at(0)));
+        }
+        qSort(sortedFiles);
+        // Add the sorted files
+        for(index = 0; index < sortedFiles.length(); index++)
+        {
+            fileSelector->addItem(sortedFiles.at(index));
+        }
+    }
+
+    fileSelectorFunction(fileSelector->currentText());
 }
 void ClassCombinerUserInterface::fileSelectorFunction(QString text)
 {
-    int indexOfCurrentlySelected = 0;
-    int indexOfDependency = 0;
-    int index = 0;
-
-    // Find the index of the file
-    for(index = 0; index < informationOfFiles.length(); index++)
+    if(text.length() > 0)
     {
-        if(informationOfFiles.at(index).endsWith(text))
-        {
-            indexOfCurrentlySelected = index;
-            break;
-        }
-    }
+        int indexOfCurrentlySelected = -1;
+        int indexOfDependency = 0;
+        int index = 0;
 
-    // Setup the table as approriate
-    informationDisplayTable->setColumnCount(0);
-    informationDisplayTable->setRowCount(0);
-    informationDisplayTable->setColumnCount(2);
-    informationDisplayTable->setRowCount(dependenciesOfFiles.at(indexOfCurrentlySelected).length());
-
-    // Fill up these rows and columns with QLineEdit's which are read only
-    for(index = 0; index < informationDisplayTable->rowCount(); index++)
-    {
-        for(indexOfDependency = 0; indexOfDependency < informationDisplayTable->columnCount(); indexOfDependency++)
+        // Find the index of the file
+        for(index = 0; index < informationOfFiles.length(); index++)
         {
-            informationDisplayTable->setCellWidget(index, indexOfDependency, new QLineEdit());
-            qobject_cast<QLineEdit*>(informationDisplayTable->cellWidget(index, indexOfDependency))->setReadOnly(true);
-        }
-    }
-
-    // Fill up the columns with dependency on left side, and the part that fills up the dependency on the other
-    // Also use the solutions from "uniqueDependencies" and "dependencyFillingList" to give easy options to assign
-    for(index = 0; index < informationDisplayTable->rowCount(); index++)
-    {
-        // Insert the dependencies
-        if(qobject_cast<QLineEdit*>(informationDisplayTable->cellWidget(index, 0)) != NULL)
-        {
-            //std::cout << "Table text - " << row << "," << column << " - " << replacementText << std::endl;
-            qobject_cast<QLineEdit*>(informationDisplayTable->cellWidget(index, 0))->setText(dependenciesOfFiles.at(indexOfCurrentlySelected).at(index));
-        }
-        
-        // Insert the first option of the list of matching possibilities
-        indexOfDependency = uniqueDependencies.indexOf(dependenciesOfFiles.at(indexOfCurrentlySelected).at(index));
-        // Inser the dependency filler
-        if(qobject_cast<QLineEdit*>(informationDisplayTable->cellWidget(index, 1)) != NULL)
-        {
-            //std::cout << "Table text - " << row << "," << column << " - " << replacementText << std::endl;
-            if(dependencyFillingList.at(indexOfDependency).length() > 0)
+            if(informationOfFiles.at(index).endsWith(text))
             {
-                qobject_cast<QLineEdit*>(informationDisplayTable->cellWidget(index, 1))->setText(dependencyFillingList.at(indexOfDependency).at(0));
+                indexOfCurrentlySelected = index;
+                break;
             }
         }
-    }
 
-    if(dependencyListType->currentText() == "Current File")
-    {
-        listOfDependencies->clear();
-        for(index = 0; index < dependenciesOfFiles.at(indexOfCurrentlySelected).length(); index++)
+        // Setup the table as approriate
+        informationDisplayTable->setColumnCount(0);
+        informationDisplayTable->setRowCount(0);
+
+        if(indexOfCurrentlySelected >= 0)
         {
-            listOfDependencies->addItem(dependenciesOfFiles.at(indexOfCurrentlySelected).at(index));
+            informationDisplayTable->setColumnCount(2);
+            informationDisplayTable->setRowCount(dependenciesOfFiles.at(indexOfCurrentlySelected).length() + 1);
+
+            // Fill up these rows and columns with QLineEdit's which are read only
+            for(index = 0; index < informationDisplayTable->rowCount(); index++)
+            {
+                for(indexOfDependency = 0; indexOfDependency < informationDisplayTable->columnCount(); indexOfDependency++)
+                {
+                    informationDisplayTable->setCellWidget(index, indexOfDependency, new QLineEdit());
+                    qobject_cast<QLineEdit*>(informationDisplayTable->cellWidget(index, indexOfDependency))->setReadOnly(true);
+                }
+            }
+            qobject_cast<QLineEdit*>(informationDisplayTable->cellWidget(0, 0))->setText("List Of Dependencies");
+            qobject_cast<QLineEdit*>(informationDisplayTable->cellWidget(0, 1))->setText("Dependency Solution");
+
+            // Fill up the columns with dependency on left side, and the part that fills up the dependency on the other
+            // Also use the solutions from "uniqueDependencies" and "dependencyFillingList" to give easy options to assign
+            for(index = 1; index < informationDisplayTable->rowCount(); index++)
+            {
+                // Insert the dependencies
+                if(qobject_cast<QLineEdit*>(informationDisplayTable->cellWidget(index, 0)) != NULL)
+                {
+                    //std::cout << "Table text - " << row << "," << column << " - " << replacementText << std::endl;
+                    qobject_cast<QLineEdit*>(informationDisplayTable->cellWidget(index, 0))->setText(dependenciesOfFiles.at(indexOfCurrentlySelected).at(index -  1));
+                }
+
+                // Insert the first option of the list of matching possibilities
+                indexOfDependency = uniqueDependencies.indexOf(dependenciesOfFiles.at(indexOfCurrentlySelected).at(index - 1));
+                // Insert the dependency filler
+                if(qobject_cast<QLineEdit*>(informationDisplayTable->cellWidget(index, 1)) != NULL)
+                {
+                    //std::cout << "Table text - " << row << "," << column << " - " << replacementText << std::endl;
+                    if(dependencyFillingList.at(indexOfDependency).length() > 0)
+                    {
+                        qobject_cast<QLineEdit*>(informationDisplayTable->cellWidget(index, 1))->setText(shortName(dependencyFillingList.at(indexOfDependency).at(0)));
+                    }
+                }
+            }
+
+            if(dependencyListType->currentText() == "Current File")
+            {
+                listOfDependencies->clear();
+                for(index = 0; index < dependenciesOfFiles.at(indexOfCurrentlySelected).length(); index++)
+                {
+                    listOfDependencies->addItem(dependenciesOfFiles.at(indexOfCurrentlySelected).at(index));
+                }
+            }
+
+            informationDisplayTable->resizeColumnsToContents();
         }
     }
 }
@@ -728,18 +787,25 @@ void ClassCombinerUserInterface::dependencySolutionList(QString text)
 {
     int indexOfCurrentlySelected = uniqueDependencies.indexOf(text);
     assignedDependency->clear();
+    assignedDependencyLineEdit->clear();
 
     if(indexOfCurrentlySelected >= 0 && dependencyFillingList.at(indexOfCurrentlySelected).length() > 0)
     {
         int index = 0;
         for(index = 0; index < dependencyFillingList.at(indexOfCurrentlySelected).length(); index++)
         {
+            if(index == 0)
+            {
+                assignedDependencyLineEdit->setText(dependencyFillingList.at(indexOfCurrentlySelected).at(index));
+            }
+
             assignedDependency->addItem(dependencyFillingList.at(indexOfCurrentlySelected).at(index));
         }
     }
     else
     {
         assignedDependency->addItem("None");
+        assignedDependencyLineEdit->setText("None");
     }
 }
 void ClassCombinerUserInterface::addDependencyFunction(bool ignore)
@@ -768,23 +834,35 @@ void ClassCombinerUserInterface::addDependencyFunction(bool ignore)
     filter += ");; All Files (*.*)";
 
     QString fileDependency = QFileDialog::getOpenFileName(this, tr("Open Header/Source Files"), "/home", filter);
+    int indexOfCurrentDependency = -1;
 
-    // Assign the file dependency to the "AssingedDependency" list and use the "ListOfDependencies" to restructure "DependencyFillingList"
-    assignedDependency->addItem(shortName(fileDependency));
-    index  = uniqueDependencies.indexOf(listOfDependencies->currentText());
-
-    if(index >= 0)
+    if(fileDependency.length() > 0)
     {
-        if(dependencyFillingList.at(index).contains(fileDependency))
+        indexOfCurrentDependency = listOfDependencies->currentIndex();
+
+        // Assign the file dependency to the "AssingedDependency" list and use the "ListOfDependencies" to restructure "DependencyFillingList"
+        assignedDependency->addItem(fileDependency);
+        assignedDependency->setCurrentIndex(assignedDependency->findText(shortName(fileDependency)));
+        assignedDependencyFunction(assignedDependency->currentText());
+        index  = uniqueDependencies.indexOf(listOfDependencies->currentText());
+
+        if(index >= 0)
         {
-            dependencyFillingList[index].remove(index);
-            dependencyFillingList[index].prepend(fileDependency);
-        }
-        else
-        {
-            dependencyFillingList[index].prepend(fileDependency);
+            if(dependencyFillingList.at(index).contains(fileDependency))
+            {
+                index = dependencyFillingList[index].indexOf(fileDependency);
+                dependencyFillingList[index].remove(index);
+                dependencyFillingList[index].prepend(fileDependency);
+            }
+            else
+            {
+                dependencyFillingList[index].prepend(fileDependency);
+            }
         }
     }
+
+    fileSelectorFunction(fileSelector->currentText());
+    listOfDependencies->setCurrentIndex(indexOfCurrentDependency);
 }
 void ClassCombinerUserInterface::assignDependency(bool ignore)
 {
@@ -795,130 +873,49 @@ void ClassCombinerUserInterface::assignDependency(bool ignore)
     QString fileDependency = assignedDependency->currentText();
     if(index >= 0)
     {
-        if(dependencyFillingList.at(index).contains(fileDependency))
+        if(fileDependency != "None")
         {
-            dependencyFillingList[index].remove(index);
-            dependencyFillingList[index].prepend(fileDependency);
+            if(dependencyFillingList.at(index).contains(fileDependency))
+            {
+                index = dependencyFillingList[index].indexOf(fileDependency);
+                dependencyFillingList[index].remove(index);
+                dependencyFillingList[index].prepend(fileDependency);
+            }
+            else
+            {
+                dependencyFillingList[index].prepend(fileDependency);
+            }
         }
         else
         {
-            dependencyFillingList[index].prepend(fileDependency);
+            dependencyFillingList[index].clear();
         }
     }
-    dependencySolutionList(listOfDependencies->currentText());
+    index = listOfDependencies->currentIndex();
+    fileSelectorFunction(fileSelector->currentText());
+    listOfDependencies->setCurrentIndex(index);
 }
-
-// ***** Part 6 Functions
-void ClassCombinerUserInterface::openDialog(bool ignore)
+void ClassCombinerUserInterface::assignedDependencyFunction(QString text)
+{
+    assignedDependencyLineEdit->setText(text);
+}
+void ClassCombinerUserInterface::removeSolutionsFunction(bool ignore)
 {
     ignore;
-    headerAndSourceTypesDialog->open(headerTypes, sourceTypes);
-}
-void ClassCombinerUserInterface::updateTypes(QVector<QString> headersTypesInput, QVector<QString> sourceTypesInput)
-{
-    int index = 0;
-    headerTypes.clear();
-    for(index = 0; index < headersTypesInput.length(); index++)
+    int indexOfCurrentlySelected = listOfDependencies->currentIndex();
+    int index = uniqueDependencies.indexOf(listOfDependencies->currentText());
+    if(index >= 0)
     {
-        headerTypes.append(headersTypesInput.at(index));
+        dependencyFillingList[index].clear();
+        index = listOfDependencies->currentIndex();
+        fileSelectorFunction(fileSelector->currentText());
+        listOfDependencies->setCurrentIndex(index);
     }
-
-    sourceTypes.clear();
-    for(index = 0; index < sourceTypesInput.length(); index++)
-    {
-        sourceTypes.append(sourceTypesInput.at(index));
-    }
+    listOfDependencies->setCurrentIndex(indexOfCurrentlySelected);
+    statusBar->setText("Clearing given potential solutions of dependency - " + listOfDependencies->currentText() + ".");
 }
 
-QStringList ClassCombinerUserInterface::convertVectorToList(QVector<QString> dataToBeConverted)
-{
-    QStringList result;
-    int index = 0;
-
-    for(index = 0; index < dataToBeConverted.length(); index++)
-    {
-        result.append(dataToBeConverted.at(index));
-    }
-
-    return result;
-}
-
-void ClassCombinerUserInterface::themeFunction(bool ignore)
-{
-    ignore;
-
-}
-void ClassCombinerUserInterface::refreshFunction(bool ignore)
-{
-    ignore;
-
-    // Clear all the primary structural variables
-    uniqueDependencies.clear();
-    dependencyFillingList.clear();
-    informationOfFiles.clear();
-    informationOfHeaderFiles.clear();
-    informationOfSourceFiles.clear();
-    informationOfFolders.clear();
-    stateOfDependenciesOfFiles.clear();
-    informationContainedWithinFiles.clear();
-    structureWeight.clear();
-
-    // Clear the UI
-    foldersToCombine->clear();
-    filesToCombine->clear();
-    outputHeaderFile->clear();
-    outputSourceFile->clear();
-    fileSelector->clear();
-    informationDisplayTable->setRowCount(0);
-    informationDisplayTable->setColumnCount(0);
-    fileSelector->clear();
-    listOfDependencies->clear();
-
-    // Set state
-    setState(0);
-    statusBar->setText("All cleared.");
-
-}
-void ClassCombinerUserInterface::setState(int state)
-{
-    if(state == 0 && stateVariable != 0) // Not a single file - No header and source. No synthesis,
-    {
-        outputFileBox->setEnabled(true);
-        fileInformationDisplayBox->setEnabled(false);
-        dependencyAssignmentBox->setEnabled(false);
-        primaryBox->setEnabled(false);
-        structuralDecomposerBox->setEnabled(false);
-
-        stateVariable = 0;
-    }
-    else if(state == 1 && stateVariable != 1) // A single file atleast, but no dependencies found
-    {
-        outputFileBox->setEnabled(true);
-        fileInformationDisplayBox->setEnabled(true);
-        dependencyAssignmentBox->setEnabled(true);
-        primaryBox->setEnabled(true);
-        structuralDecomposerBox->setEnabled(true);
-        synthesizeButton->setEnabled(false);
-
-        // Ensure the UI related to dependencies is updated
-        dependencyDisplay(dependencyListType->currentText());
-
-        stateVariable = 1;
-    }
-    else if(state == 2 && stateVariable != 2) // A single file and dependencies found
-    {
-        outputFileBox->setEnabled(true);
-        fileInformationDisplayBox->setEnabled(true);
-        dependencyAssignmentBox->setEnabled(true);
-        primaryBox->setEnabled(true);
-        structuralDecomposerBox->setEnabled(true);
-        synthesizeButton->setEnabled(true);
-
-        stateVariable = 2;
-    }
-}
-
-// ***** Key Non-UI related functions for the program ******
+// ***** Part 5 - Key Non-UI related functions for the program ******
 void ClassCombinerUserInterface::findAllHeadersAndSourcesLocally(QString folderNameInput)
 {
     QDir folderToAnalyze(folderNameInput);
@@ -949,6 +946,8 @@ void ClassCombinerUserInterface::findAllHeadersAndSourcesLocally(QString folderN
 }
 void ClassCombinerUserInterface::recursiveSearch(QString sourceFolder)
 {
+    //setState(3);
+
     QDir source(sourceFolder);
 
     if(source.isReadable())
@@ -982,6 +981,8 @@ void ClassCombinerUserInterface::recursiveSearch(QString sourceFolder)
             recursiveSearch(subsequentDirectories.at(index));
         }
     }
+
+    //setState(idealState);
 }
 void ClassCombinerUserInterface::analyzeFile(QString fileInput, int indexWithinStructure)
 {
@@ -994,6 +995,12 @@ void ClassCombinerUserInterface::analyzeFile(QString fileInput, int indexWithinS
         QTextStream in(&file);
         QStringList lineAnalysis = in.readAll().split("\n");
         QString sourceInformation;
+        QString dependency = "";
+
+        bool withinMainFunction  = false;
+        bool mainFunctionContained = false;
+        QString mainFunctionData = "";
+        int tier = 0;
 
         int index = 0;
         for(index = 0; index < lineAnalysis.length(); index++)
@@ -1003,8 +1010,58 @@ void ClassCombinerUserInterface::analyzeFile(QString fileInput, int indexWithinS
             {
                 //std::cout << "Line " << index << " - " << lineAnalysis.at(index).toStdString() << std::endl;
                 //std::cout << analyzeIncludeStatement(QString(lineAnalysis.at(index))).toStdString() << std::endl;
-                (dependenciesOfFiles[indexWithinStructure]).append(analyzeIncludeStatement(QString(lineAnalysis.at(index))));
-                (stateOfDependenciesOfFiles[indexWithinStructure]).append(false);
+
+                dependency = QString(lineAnalysis.at(index));
+                if(!dependencyOriginalForm.contains(dependency))
+                {
+                    dependencyOriginalForm.append(dependency);
+                }
+
+                dependency = analyzeIncludeStatement(dependency);
+                if(dependency.length() > 0)
+                {
+                    dependenciesOfFiles[indexWithinStructure].append(dependency);
+                    stateOfDependenciesOfFiles[indexWithinStructure].append(false);
+                }
+            }
+            else if(QString(lineAnalysis.at(index)).contains(" main(", Qt::CaseInsensitive))
+            {
+                mainFunctionContained = true;
+                withinMainFunction = true;
+
+                if(QString(lineAnalysis.at(index)).contains('{') )
+                {
+                    tier++;
+                }
+
+                if(QString(lineAnalysis.at(index)).contains('}') )
+                {
+                    tier--;
+                    if(tier == 0)
+                    {
+                        withinMainFunction = false;
+                    }
+                }
+
+                mainFunctionData.append(QString(lineAnalysis.at(index)));
+            }
+            else if(withinMainFunction)
+            {
+                if(QString(lineAnalysis.at(index)).contains('{') )
+                {
+                    tier++;
+                }
+
+                if(QString(lineAnalysis.at(index)).contains('}') )
+                {
+                    tier--;
+                    if(tier == 0)
+                    {
+                        withinMainFunction = false;
+                    }
+                }
+
+                mainFunctionData.append(QString(lineAnalysis.at(index)));
             }
             else
             {
@@ -1012,10 +1069,86 @@ void ClassCombinerUserInterface::analyzeFile(QString fileInput, int indexWithinS
             }
         }
 
-        //std::cout << sourceInformation.toStdString() << std::endl;
-        //informationContainedWithinFiles.replace(indexWithinStructure, sourceInformation);
+        informationContainedWithinFiles.replace(indexWithinStructure, sourceInformation);
+
+        if(mainFunctionContained)
+        {
+            //std::cout << "Main contained " << mainFunctionData.toStdString() << std::endl;
+            //std::cout << "Reamining " << sourceInformation.toStdString() << std::endl;
+
+            QVector<QString> temp;
+            temp.clear();
+            temp.append(fileInput);
+            temp.append(mainFunctionData);
+            mainFilesAndDefinition.append(temp);
+        }
     }
 }
+// Removes the main function from the file
+/*
+bool ClassCombinerUserInterface::removeMainFunctionFromFile(QString fileData, QString &mainFunctionData, QString &remainingData)
+{
+    bool result = false;
+    bool withinMainFunction  = false;
+    int tier = 0;
+    mainFunctionData.clear();
+    remainingData.clear();
+
+    QStringList lineAnalysis = fileData.split("\r\n");
+    QString currentLine = "";
+
+    int index = 0;
+    for(index = 0; index < lineAnalysis.length(); index++)
+    {
+        currentLine = QString((lineAnalysis.at(index)));
+        if(currentLine.contains(" main(", Qt::CaseInsensitive) )
+        {
+            withinMainFunction = true;
+            result = true;
+
+            if(currentLine.contains('{') )
+            {
+                tier++;
+            }
+
+            if(currentLine.contains('}') )
+            {
+                tier--;
+                if(tier == 0)
+                {
+                    withinMainFunction = false;
+                }
+            }
+
+            mainFunctionData.append(currentLine);
+        }
+        else if(withinMainFunction)
+        {
+                if(currentLine.contains('{') )
+                {
+                    tier++;
+                }
+
+                if(currentLine.contains('}') )
+                {
+                    tier--;
+                    if(tier == 0)
+                    {
+                        withinMainFunction = false;
+                    }
+                }
+                mainFunctionData.append(currentLine);
+        }
+        else
+        {
+            remainingData.append(currentLine);
+        }
+
+    }
+
+    return result;
+}
+*/
 QString ClassCombinerUserInterface::analyzeIncludeStatement(QString text)
 {
     QString result;
@@ -1079,8 +1212,11 @@ QString ClassCombinerUserInterface::analyzeIncludeStatement(QString text)
     return result.remove("\n");
 }
 // Ensures structural similarity when things increase
+// Only used when a file is added
 void ClassCombinerUserInterface::ensureStructuralCoherence()
 {
+    //setState(3);
+
     int lengthIndex = informationOfFiles.length();
     int indexOfAddition = lengthIndex - 1;
 
@@ -1116,6 +1252,8 @@ void ClassCombinerUserInterface::ensureStructuralCoherence()
     //status = "Done analyzing " + informationOfFiles[indexOfAddition];
     //status += ".";
     //statusBar->setText(status);
+
+    //setState(idealState);
 }
 // Ensures structural coherence whenever things decrease
 void ClassCombinerUserInterface::ensureStructuralCoherence(int indexOfRemoval)
@@ -1129,34 +1267,540 @@ void ClassCombinerUserInterface::ensureStructuralCoherence(int indexOfRemoval)
 void ClassCombinerUserInterface::analyzeAll(bool ignore)
 {
     ignore;
+    this->setDisabled(true);
 
-    if(informationOfFiles.length() > 0)
+    int dependencyCurrentlySelectedByGUI = listOfDependencies->currentIndex();
+    int index = 0;
+    if(uniqueDependencies.length() > 0)
     {
-        int index = 0;
-        for(index = 0; index < informationOfFiles.length(); index++)
+        for(index = 0; index < uniqueDependencies.length(); index++)
         {
-            findFileDependencies(index);
+            findDependenciesSolutions(index);
         }
-
-        fileSelectorFunction(fileSelector->currentText());
-        dependencySolutionList(listOfDependencies->currentText());
     }
+    fileSelectorFunction(fileSelector->currentText());
+    listOfDependencies->setCurrentIndex(dependencyCurrentlySelectedByGUI);
+    idealState = 2;
+    this->setDisabled(false);
+    this->setState(idealState);
 
-    setState(2);
+    statusBar->setText("Analysis Done. Please check undefined dependencies.");
 }
 // Finds solution at dependency. Finds the file at the given index, the dependencies at the index, and attempts to solve the index
-void ClassCombinerUserInterface::findFileDependencies(int index)
+void ClassCombinerUserInterface::findDependenciesSolutions(int indexOfDependency)
 {
-    index;
+    // Determine the dependencies
+    // The set of possible matching dependencies is the set of all header and source files located
+    int index = 0;
+    int rating = 0;
+    bool validRating = false;
+    QVector<QString> listOfPossibleSolutions;
+    QVector<int> validityOfSolutions;
+
+    for(index = 0; index < informationOfFiles.length(); index++)
+    {
+        similarityRating(uniqueDependencies.at(indexOfDependency), informationOfFiles.at(index), rating, validRating);
+        if(validRating)
+        {
+            listOfPossibleSolutions.append(informationOfFiles.at(index));
+            validityOfSolutions.append(rating);
+        }
+    }
+
+    // Reorganize the list of potential solutions according to rating, with highest rating being higher
+    int otherIndex = 0;
+    int highestValue = 0, highestIndex = 0;
+    QString tempString = "";
+    int tempInt = 0;
+    for(index = 0; index < validityOfSolutions.length() - 1; index++)
+    {
+        highestValue = validityOfSolutions.at(index);
+        highestIndex = index;
+
+        // Find the highest solution
+        for(otherIndex = index + 1; otherIndex < validityOfSolutions.length(); otherIndex++)
+        {
+            if(validityOfSolutions.at(otherIndex) > highestValue)
+            {
+                highestIndex = otherIndex;
+                highestValue = validityOfSolutions.at(index);
+            }
+        }
+
+        // Swap the highest value with the current value
+        if(highestIndex != index)
+        {
+            tempInt = validityOfSolutions[highestIndex];
+            tempString = listOfPossibleSolutions[highestIndex];
+
+            validityOfSolutions.replace(highestIndex, validityOfSolutions.at(index));
+            listOfPossibleSolutions.replace(highestIndex, listOfPossibleSolutions.at(index));
+
+            validityOfSolutions.replace(index, tempInt);
+            listOfPossibleSolutions.replace(index, tempString);
+        }
+    }
+
+    // Put the values in
+    dependencyFillingList.replace(indexOfDependency, listOfPossibleSolutions);
 }
+void ClassCombinerUserInterface::similarityRating(QString dependency, QString potentialSolution, int &rating, bool &validRating)
+{
+    potentialSolution = shortName(potentialSolution).toLower();
+    dependency = dependency.toLower();
+    rating = 0;
+    int index = 0;
+    int otherIndex = 0;
+    QChar currentChar, otherChar;
+    for(index = 0; index < potentialSolution.length(); index++)
+    {
+        if(dependency.length() > otherIndex)
+        {
+            otherChar = dependency.at(otherIndex);
+            currentChar = potentialSolution.at(index);
+            //std::cout << "Similarity " << otherChar.toLatin1() << " - " << currentChar.toLatin1() << std::endl;
+            if(otherChar == currentChar)
+            {
+                rating++;
+            }
+            else
+            {
+                rating--;
+            }
+        }
+        otherIndex++;
+    }
+
+    // Need to account for how many characters are the same
+    if(double(rating)/dependency.length() > 0.5)
+    {
+        validRating = true;
+        // Print rating
+        //std::cout << "Rating of similarity " << dependency.toStdString() << " - " << potentialSolution.toStdString() << " - " << rating << " - " << validRating << std::endl;
+    }
+    else
+    {
+        validRating = false;
+    }
+}
+
 // Combines files by analyzing the dependencies and their solutions
+// User must avoid circular dependencies for this to work properly
 void ClassCombinerUserInterface::synthesize(bool ignore)
+{
+    this->setDisabled(true);
+    ignore;
+
+    // Proceed only if resulting files can be opened
+    QFile headerFile(outputHeaderFile->text());
+    QFile sourceFile(outputSourceFile->text());
+
+    bool proceed = false;
+    proceed = headerFile.open(QIODevice::ReadWrite);
+    if(proceed)
+    {
+        proceed = sourceFile.open(QIODevice::ReadWrite);
+    }
+
+    if(proceed)
+    {
+        this->statusBar->setText("Starting synthesis");
+
+        // Analyze Files
+        int index = 0;
+        QVector<QString> temporaryInformationOfFiles;
+        QVector<QString> temporaryDependencies;
+        QVector<QString> listOfAllDependenciesLocal;
+        QVector<QString> listOfAllSources;;
+
+        for(index = 0; index < informationOfFiles.length(); index++)
+        {
+            if(!temporaryInformationOfFiles.contains(informationOfFiles.at(index))) // File not yet examined
+            {
+                addAndAnalyzeFile(informationOfFiles.at(index), listOfAllSources, listOfAllDependenciesLocal, temporaryInformationOfFiles, temporaryDependencies );
+            }
+        }
+        this->setDisabled(false);
+
+        QTextStream a(&headerFile);
+        QTextStream b(&sourceFile);
+
+        //std::cout << "Dependencies" << std::endl;
+        for(index = 0; index < listOfAllDependenciesLocal.length(); index++)
+        {
+            //std::cout << temporaryDependencies.at(index).toStdString() << std::endl;
+            //std::cout << listOfAllDependenciesLocal.at(index).toStdString() << std::endl;
+            a << listOfAllDependenciesLocal.at(index) << "\n";
+        }
+        std::cout << "\r\n" << std::endl;
+        b << "#include \"" << shortName(outputHeaderFile->text()) << "\"" << "\n";
+
+        QString string;
+        QStringList stringList;
+        int otherIndex = 0;
+        for(index = 0; index < temporaryInformationOfFiles.length(); index++)
+        {
+            //std::cout << "File to be added: " << temporaryInformationOfFiles.at(index).toStdString() << std::endl;
+
+            string = listOfAllSources[index];
+            stringList = string.split("\r\n");
+            stringList = string.split(QChar(13));
+
+            if(checkForHeaderType(temporaryInformationOfFiles.at(index)))
+            {
+                for(otherIndex = 0; otherIndex < stringList.length(); otherIndex++)
+                {
+                    //std::cout << "StringManual " << QString(stringList.at(otherIndex)).toStdString() << std::endl;
+                    a << stringList.at(otherIndex) << "\n";
+                }
+            }
+            else if(checkForSourceType(temporaryInformationOfFiles.at(index)))
+            {
+                for(otherIndex = 0; otherIndex < stringList.length(); otherIndex++)
+                {
+                    //std::cout << "StringManual " << QString(stringList.at(otherIndex)).toStdString() << std::endl;
+                    b << stringList.at(otherIndex) << "\n";
+                }
+            }
+        }
+
+        this->statusBar->setText("Synthesis Complete");
+    }
+    else
+    {
+        statusBar->setText("Resulting files cannot be opened. Please ensure they can so results have a location to be placed.");
+    }
+
+    this->setDisabled(false);
+}
+
+// Add the file and its dependencies to the structure
+void ClassCombinerUserInterface::addAndAnalyzeFile(QString fileToConsider,  QVector<QString> &listOfAllSources, QVector<QString> &listOfAllDependenciesLocal, QVector<QString> &temporaryInformationOfFiles, QVector<QString> &temporaryUniqueDependencies)
+{
+    int indexOfFile = informationOfFiles.indexOf(fileToConsider);
+
+    //std::cout << "File about to be analyzed: " << fileToConsider.toStdString() << std::endl;
+
+    // File contained within the structure and not already added
+    if(indexOfFile >= 0 && !temporaryInformationOfFiles.contains(fileToConsider))
+    {
+        int index = 0, indexOfDependency = 0;
+
+        // Ensure each dependency is added for the file is added, then add the file
+        QString currentDependency, currentDependencySolution;
+        for(index = 0; index < dependenciesOfFiles.at(indexOfFile).length(); index++)
+        {
+            currentDependency = dependenciesOfFiles.at(indexOfFile).at(index);
+            indexOfDependency = uniqueDependencies.indexOf(currentDependency);
+
+            if(indexOfDependency >= 0 && !temporaryUniqueDependencies.contains(currentDependency))
+            {
+                // If there is a solution
+                if(dependencyFillingList.at(indexOfDependency).length() > 0)
+                {
+                    currentDependencySolution = dependencyFillingList.at(indexOfDependency).at(0);
+
+                    //  Solution contained within internal structure
+                    // Make sure to check if its not already been added
+                    if(informationOfFiles.contains(currentDependencySolution))
+                    {
+                        addAndAnalyzeFile(currentDependencySolution, listOfAllSources, listOfAllDependenciesLocal, temporaryInformationOfFiles, temporaryUniqueDependencies);
+                    }
+                    // Solution not contained. Analyze this file independently
+                    else if(!temporaryInformationOfFiles.contains(currentDependencySolution))
+                    {
+                        extractAndAddFile(fileToConsider, temporaryInformationOfFiles, temporaryUniqueDependencies, listOfAllDependenciesLocal, listOfAllSources);
+                    }
+                }
+                // No solution for the dependency.
+                // The solution must not be within 'uniqueDependencies' to come here
+                // Add the dependency to the list of solutions
+                else if(!temporaryUniqueDependencies.contains(currentDependency))
+                {
+                    temporaryUniqueDependencies.append(currentDependency);
+                    listOfAllDependenciesLocal.append(extractDependencyOriginalForm(currentDependency));
+                }
+            }
+            // Dependency somehow is not contained within the structure
+            // The dependency has not been solved for, so simply add the original form of the dependency
+            else if(!temporaryUniqueDependencies.contains(currentDependency))
+            {
+                temporaryUniqueDependencies.append(currentDependency);
+                listOfAllDependenciesLocal.append(extractDependencyOriginalForm(currentDependency));
+            }
+        }
+
+        // Ensure the file is added and that it is known that the file has been added
+        temporaryInformationOfFiles.append(fileToConsider);
+        // Add the source to the data
+        listOfAllSources.append(informationContainedWithinFiles.at(indexOfFile));
+    }
+    // File is not contained within internal structure
+    // No need to look at this thing within the internal structure
+    else if(!temporaryInformationOfFiles.contains(fileToConsider))
+    {
+        extractAndAddFile(fileToConsider, temporaryInformationOfFiles, temporaryUniqueDependencies, listOfAllDependenciesLocal, listOfAllSources);
+    }
+}
+
+// Yields the original form of the dependency
+QString ClassCombinerUserInterface::extractDependencyOriginalForm(QString test)
+{
+    QString result;
+    int index;
+    for(index = 0; index < dependencyOriginalForm.length(); index++)
+    {
+        if(analyzeIncludeStatement(dependencyOriginalForm.at(index)) == test)
+        {
+            result = dependencyOriginalForm.at(index);
+            break;
+        }
+    }
+
+    return result;
+}
+
+// Take that
+void ClassCombinerUserInterface::extractAndAddFile(QString fileInput, QVector<QString> &temporaryInformationOfFiles, QVector<QString> &temporaryUniqueDependencies, QVector<QString> &listOfAllDependencies, QVector<QString> &listOfAllSources)
+{
+    // Strings to divide file into 3 parts, dependencies (which may be repeated), source information, and the main function
+    QString sourceData, dependencyData, mainData;
+
+    // Add the file to files already added
+    temporaryInformationOfFiles.append(fileInput);
+    // Add the data from this file not contained within the internal structure
+    // to list of dependencies
+    extractInformationFromFile(fileInput, dependencyData, sourceData, mainData);
+    // Add the source data to that file
+    listOfAllSources.append(sourceData);
+    // Add the dependencies uniquely to the vector in full form
+    uniquelyAddDependencies(listOfAllDependencies, temporaryUniqueDependencies, dependencyData);
+}
+
+// Add the unique dependencies not already added
+// Adds in form "#include <> or #include "" to 'temporaryUniqueDependencies' "
+void ClassCombinerUserInterface::uniquelyAddDependencies(QVector<QString> &listOfAllDependenciesLocal, QVector<QString> &temporaryUniqueDependencies, QString stringToAnalyze)
+{
+    int index = 0;
+    QVector<QString> temp;
+    for(index = 0; index < listOfAllDependenciesLocal.length(); index++)
+    {
+        temp.append(listOfAllDependenciesLocal.at(index));
+    }
+
+    for(index = 0; index < temp.length(); index++)
+    {
+        if(stringToAnalyze.contains(temp.at(index)))
+        {
+            stringToAnalyze.remove(temp.at(index));
+        }
+    }
+
+    // Combine now
+    QStringList tempA = stringToAnalyze.split("\n");
+    QString tempB;
+    for(index = 0; index < tempA.length(); index++)
+    {
+        tempB = QString(tempA.at(index));
+        if(tempB.contains("#include"))
+        {
+            listOfAllDependenciesLocal.append(tempB);
+            temporaryUniqueDependencies.append(analyzeIncludeStatement(tempB));
+        }
+    }
+}
+
+// Extract relevant information from file by separating the dependencies, source data, and main function
+void ClassCombinerUserInterface::extractInformationFromFile(QString fileInput, QString &dependencies, QString &sourceExcludingMain, QString &mainFunction)
+{
+    QFile file(fileInput);
+
+    if(file.exists() && file.open(QIODevice::ReadWrite))
+    {
+        QTextStream in(&file);
+        QStringList lineAnalysis = in.readAll().split("\n");
+        QString sourceInformation = "";
+        QString dependency = "";
+        QString mainFunctionData = "";
+
+        bool withinMainFunction  = false;
+        bool mainFunctionContained = false;
+        int tier = 0;
+
+        int index = 0;
+        for(index = 0; index < lineAnalysis.length(); index++)
+        {
+            //std::cout << "Line " << index << " - " << lineAnalysis.at(index).toStdString() << std::endl;
+            if(QString(lineAnalysis.at(index)).contains("#include", Qt::CaseInsensitive) && QString(lineAnalysis.at(index)).startsWith('#'))
+            {
+                dependency += QString(lineAnalysis.at(index));
+            }
+            else if(QString(lineAnalysis.at(index)).contains(" main(", Qt::CaseInsensitive))
+            {
+                mainFunctionContained = true;
+                withinMainFunction = true;
+
+                if(QString(lineAnalysis.at(index)).contains('{') )
+                {
+                    tier++;
+                }
+
+                if(QString(lineAnalysis.at(index)).contains('}') )
+                {
+                    tier--;
+                    if(tier == 0)
+                    {
+                        withinMainFunction = false;
+                    }
+                }
+
+                mainFunctionData.append(QString(lineAnalysis.at(index)));
+            }
+            else if(withinMainFunction)
+            {
+                if(QString(lineAnalysis.at(index)).contains('{') )
+                {
+                    tier++;
+                }
+
+                if(QString(lineAnalysis.at(index)).contains('}') )
+                {
+                    tier--;
+                    if(tier == 0)
+                    {
+                        withinMainFunction = false;
+                    }
+                }
+
+                mainFunctionData.append(QString(lineAnalysis.at(index)));
+            }
+            else
+            {
+                sourceInformation += QString(lineAnalysis.at(index));
+            }
+        }
+
+        sourceExcludingMain = sourceInformation;
+        dependencies = dependency;
+        mainFunction = mainFunctionData;
+    }
+}
+
+// ***** Part 6 Functions
+void ClassCombinerUserInterface::openDialog(bool ignore)
+{
+    ignore;
+    headerAndSourceTypesDialog->open(headerTypes, sourceTypes);
+}
+void ClassCombinerUserInterface::updateTypes(QVector<QString> headersTypesInput, QVector<QString> sourceTypesInput)
+{
+    int index = 0;
+    headerTypes.clear();
+    for(index = 0; index < headersTypesInput.length(); index++)
+    {
+        headerTypes.append(headersTypesInput.at(index));
+    }
+
+    sourceTypes.clear();
+    for(index = 0; index < sourceTypesInput.length(); index++)
+    {
+        sourceTypes.append(sourceTypesInput.at(index));
+    }
+}
+QStringList ClassCombinerUserInterface::convertVectorToList(QVector<QString> dataToBeConverted)
+{
+    QStringList result;
+    int index = 0;
+
+    for(index = 0; index < dataToBeConverted.length(); index++)
+    {
+        result.append(dataToBeConverted.at(index));
+    }
+
+    return result;
+}
+void ClassCombinerUserInterface::themeFunction(bool ignore)
 {
     ignore;
 
-    // Analyze Files
-    int index = 0;
+}
+void ClassCombinerUserInterface::refreshFunction(bool ignore)
+{
+    ignore;
 
+    // Clear all the primary structural variables
+    uniqueDependencies.clear();
+    dependencyFillingList.clear();
+    informationOfFiles.clear();
+    informationOfHeaderFiles.clear();
+    informationOfSourceFiles.clear();
+    informationOfFolders.clear();
+    stateOfDependenciesOfFiles.clear();
+    informationContainedWithinFiles.clear();
+    structureWeight.clear();
+
+    // Clear the UI
+    foldersToCombine->clear();
+    filesToCombine->clear();
+    outputHeaderFile->clear();
+    outputSourceFile->clear();
+
+    fileTypeSelector->setCurrentIndex(0);
+    fileSelector->clear();
+    dependencyListType->setCurrentIndex(0);
+    dependencyDisplay(dependencyListType->currentText());
+    dependencySolutionList(listOfDependencies->currentText());
+
+    // Set state
+    idealState = 0;
+    setState(0);
+    statusBar->setText("All cleared.");
+}
+void ClassCombinerUserInterface::setState(int state)
+{
+    if(state == 0 && stateVariable != 0) // Not a single file - No header and source. No synthesis,
+    {
+        this->setEnabled(true);
+        outputFileBox->setEnabled(true);
+        fileInformationDisplayBox->setEnabled(false);
+        dependencyAssignmentBox->setEnabled(false);
+        primaryBox->setEnabled(false);
+        structuralDecomposerBox->setEnabled(false);
+
+        stateVariable = 0;
+    }
+    else if(state == 1 && stateVariable != 1) // A single file atleast, but no dependencies found
+    {
+        this->setEnabled(true);
+        outputFileBox->setEnabled(true);
+        fileInformationDisplayBox->setEnabled(true);
+        dependencyAssignmentBox->setEnabled(true);
+        primaryBox->setEnabled(true);
+        structuralDecomposerBox->setEnabled(true);
+        synthesizeButton->setEnabled(false);
+
+        // Ensure the UI related to dependencies is updated
+        dependencyDisplay(dependencyListType->currentText());
+
+        stateVariable = 1;
+    }
+    else if(state == 2 && stateVariable != 2) // A single file and dependencies found
+    {
+        this->setEnabled(true);
+        outputFileBox->setEnabled(true);
+        fileInformationDisplayBox->setEnabled(true);
+        dependencyAssignmentBox->setEnabled(true);
+        primaryBox->setEnabled(true);
+        structuralDecomposerBox->setEnabled(true);
+        synthesizeButton->setEnabled(true);
+
+        stateVariable = 2;
+    }
+    else if(state == 3 && stateVariable != 3)
+    {
+        stateVariable = 3;
+        this->setDisabled(true);
+    }
 }
 
 // ******* HeaderAndSourcesTypesDialog ******* //
@@ -1249,10 +1893,10 @@ void HeaderAndSourceTypesDialog::hideOrOpen(bool ignore)
 }
 void HeaderAndSourceTypesDialog::rejectFunction(bool ignore)
 {
+    ignore;
     emitInformation = false;
     hideOrOpen(false);
 }
-
 void HeaderAndSourceTypesDialog::open(QVector<QString> headerTypes, QVector<QString> sourceTypes)
 {
     headerTypesWidget->clear();
@@ -1330,9 +1974,9 @@ stateOfDependenciesOfFiles.resize(0);
 stateOfDependenciesOfFiles.resize(informationOfFiles.length());
 structureWeight.resize(0);
 structureWeight.resize(informationOfFiles.length());
-*/
+
 // Excess code from addFile(QString file)
-/*
+
 if(!informationOfFiles.contains(file))
 {
     informationOfFiles.append(file);

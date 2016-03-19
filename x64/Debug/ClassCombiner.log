@@ -1,0 +1,32 @@
+﻿Build started 3/7/2016 1:41:32 PM.
+     1>Project "C:\Users\HP\Documents\Projects\ClassCombiner\ClassCombiner\ClassCombiner.vcxproj" on node 2 (Build target(s)).
+     1>CustomBuild:
+         Moc'ing classcombineruserinterface.h...
+         Moc'ing mainwindow.h...
+         Uic'ing mainwindow.ui...
+         Rcc'ing images.qrc...
+       ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\x86_amd64\CL.exe /c /I. /IC:\Qt\Qt5.5.1\5.5\msvc2013_64\include /IC:\Qt\Qt5.5.1\5.5\msvc2013_64\include\QtWidgets /IC:\Qt\Qt5.5.1\5.5\msvc2013_64\include\QtGui /IC:\Qt\Qt5.5.1\5.5\msvc2013_64\include\QtANGLE /IC:\Qt\Qt5.5.1\5.5\msvc2013_64\include\QtCore /Idebug /I. /I"C:\Qt\Qt5.5.1\5.5\msvc2013_64\mkspecs\win32-msvc2013" /I.\GeneratedFiles /Zi /nologo /W3 /WX- /Od /D _WINDOWS /D UNICODE /D WIN32 /D WIN64 /D QT_WIDGETS_LIB /D QT_GUI_LIB /D QT_CORE_LIB /Gm- /EHsc /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /GR /Fo"x64\Debug\\" /Fd"x64\Debug\vc120.pdb" /Gd /TP /errorReport:prompt -w34100 -w34189 -w44996 classcombineruserinterface.cpp Debug\moc_classcombineruserinterface.cpp Debug\moc_mainwindow.cpp main.cpp mainwindow.cpp
+         classcombineruserinterface.cpp
+     1>classcombineruserinterface.cpp(1161): warning C4189: 'index' : local variable is initialized but not referenced
+     1>classcombineruserinterface.cpp(1253): warning C4100: 'ignore' : unreferenced formal parameter
+         moc_classcombineruserinterface.cpp
+         moc_mainwindow.cpp
+         main.cpp
+         mainwindow.cpp
+         Generating Code...
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\x86_amd64\CL.exe /c /I. /IC:\Qt\Qt5.5.1\5.5\msvc2013_64\include /IC:\Qt\Qt5.5.1\5.5\msvc2013_64\include\QtWidgets /IC:\Qt\Qt5.5.1\5.5\msvc2013_64\include\QtGui /IC:\Qt\Qt5.5.1\5.5\msvc2013_64\include\QtANGLE /IC:\Qt\Qt5.5.1\5.5\msvc2013_64\include\QtCore /Idebug /I. /I"C:\Qt\Qt5.5.1\5.5\msvc2013_64\mkspecs\win32-msvc2013" /I.\GeneratedFiles /Zi /nologo /W3 /WX- /Od /D _WINDOWS /D UNICODE /D WIN32 /D WIN64 /D QT_WIDGETS_LIB /D QT_GUI_LIB /D QT_CORE_LIB /Gm- /EHsc /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /GR /Fo"x64\Debug\\" /Fd"x64\Debug\vc120.pdb" /Gd /TP /errorReport:prompt -w34100 -w34189 -w44996 GeneratedFiles\qrc_images.cpp
+         qrc_images.cpp
+       Link:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\x86_amd64\link.exe /ERRORREPORT:PROMPT /OUT:"debug\\ClassCombiner.exe" /NOLOGO /LIBPATH:C:\Qt\Qt5.5.1\5.5\msvc2013_64\lib /LIBPATH:C:/qt/qt5.5.1/5.5/msvc2013_64/lib /LIBPATH:C:\Qt\Qt5.5.1\5.5\msvc2013_64\lib C:\Qt\Qt5.5.1\5.5\msvc2013_64\lib\qtmaind.lib shell32.lib C:/qt/qt5.5.1/5.5/msvc2013_64/lib\Qt5Cored.lib C:\Qt\Qt5.5.1\5.5\msvc2013_64\lib\Qt5Widgetsd.lib C:\Qt\Qt5.5.1\5.5\msvc2013_64\lib\Qt5Guid.lib C:\Qt\Qt5.5.1\5.5\msvc2013_64\lib\Qt5Cored.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"debug\ClassCombiner.pdb" /SUBSYSTEM:WINDOWS /TLBID:1 /DYNAMICBASE /NXCOMPAT /MACHINE:X64 "/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' publicKeyToken='6595b64144ccf1df' language='*' processorArchitecture='*'" x64\Debug\classcombineruserinterface.obj
+         x64\Debug\moc_classcombineruserinterface.obj
+         x64\Debug\moc_mainwindow.obj
+         x64\Debug\qrc_images.obj
+         x64\Debug\main.obj
+         x64\Debug\mainwindow.obj
+         ClassCombiner.vcxproj -> C:\Users\HP\Documents\Projects\ClassCombiner\ClassCombiner\debug\ClassCombiner.exe
+     1>Done Building Project "C:\Users\HP\Documents\Projects\ClassCombiner\ClassCombiner\ClassCombiner.vcxproj" (Build target(s)).
+
+Build succeeded.
+
+Time Elapsed 00:00:36.18

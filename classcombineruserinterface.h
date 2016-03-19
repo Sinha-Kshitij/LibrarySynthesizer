@@ -126,6 +126,8 @@ class ClassCombinerUserInterface : public QWidget
         void dependencySolutionList(QString text); // Lists the dependencies and solutions
         void assignDependency(bool ignore); // Assigns the current dependency proposed solution as the solution for current dependency
         void addDependencyFunction(bool ignore); // Adds a solution beyond the current scope of potential solutions as the dependency solution for the dependency in question!
+        void assignedDependencyFunction(QString text); // Displays the full form of the text
+        void removeSolutionsFunction(bool ignore); // Clears the list of potential solutions for the given dependency
 
         // Ensures all structures are in place
         // Combines UI from 1, 2, 3, 4
@@ -133,20 +135,35 @@ class ClassCombinerUserInterface : public QWidget
         // And adds unique dependencies as approriate
         void ensureStructuralCoherence();
         void ensureStructuralCoherence(int indexOfRemoval); // Ensures the internal structure is coherent when files are removed
+        // Analyzes file, seeking out all include statements, the relevant information withint the file
+        // and attempts to find all other dependencies the file has.
+        // Analyzes the files for dependencies, source and source information.
+        void analyzeFile(QString fileInput, int indexWithinStructure);
+        QString analyzeIncludeStatement(QString text); // Analyzes include statement
 
         // Part 5 Functions - Structure Display
 
 
         // Part 6 Functions - Analyze and Combine
         void analyzeAll(bool ignore); // Analyzes all files for dependencies
+        // Finds the solution of the dependencies from the internal file set
+        void findDependenciesSolutions(int indexOfDependency);
+        // Use a rating of similarity to determine what the solutions are
+        void similarityRating(QString dependency, QString potentialSolution, int &rating, bool &validRating);
+        // Synthesize the files by getting structure
         void synthesize(bool ignore); // Combines all the files in accordance with dependency structure
-        // Analyzes file, seeking out all include statements, the relevant information withint the file
-        // and attempts to find all other dependencies the file has.
-        // Analyzes the files for dependencies, source and source information.
-        void analyzeFile(QString fileInput, int indexWithinStructure);
-        QString analyzeIncludeStatement(QString text); // Analyzes include statement
-        // Finds whether the file dependencies are local
-        void findFileDependencies(int index);
+        // Add the unique dependencies not already added
+        void uniquelyAddDependencies(QVector<QString> &listOfAllDependenciesLocal, QVector<QString> &temporaryUniqueDependencies, QString dependencyData);
+        // Add and analyze the file and all its dependencies
+        // Does not add main functions
+        void addAndAnalyzeFile(QString fileToConsider,  QVector<QString> &listOfAllSources, QVector<QString> &listOfAllDependencies, QVector<QString> &temporaryInformationOfFiles, QVector<QString> &temporaryUniqueDependencies);
+        // Add external file not already analyzed
+        void extractAndAddFile(QString fileInput, QVector<QString> &temporaryInformationOfFiles, QVector<QString> &temporaryUniqueDependencies, QVector<QString> &listOfAllDependencies, QVector<QString> &listOfAllSources);
+        // Add data from file not contained within structure
+        void extractInformationFromFile(QString fileInput, QString &dependencies, QString &sourceExcludingMain, QString &mainFunction);
+        // Get original form
+        QString extractDependencyOriginalForm(QString result);
+
 
         // UI stuff
         void openDialog(bool ignore); // Opens the dialog for manipulation of header and source types definition
@@ -196,6 +213,8 @@ class ClassCombinerUserInterface : public QWidget
         QComboBox *assignedDependency; // Controlled by DependencySolutionList, or assignDependencyButton, or addDependencyButton
         QPushButton *assignDependencyButton; // Switches the current item at assignedDependency to top of assigned dependency
         QPushButton *addDependencyButton; // Adds to assignedDependency
+        QLineEdit *assignedDependencyLineEdit; // Displays completely the solution list
+        QPushButton *removeDependencyButton; // Removes all proposed solutions
 
         // Part 5 - Structural Decomposer
         QGroupBox *structuralDecomposerBox;
@@ -225,6 +244,7 @@ class ClassCombinerUserInterface : public QWidget
 
         // The following 2 internal structure are coherent. One contains the dependencies, the other the solution
         QVector<QString> uniqueDependencies; // Contains the list of unique dependencies
+        QVector<QString> dependencyOriginalForm;
         QVector<QVector<QString>> dependencyFillingList; // Contains the list of potential solutions for a given dependency. Aligned with uniqueDependency
 
         // The following internal structures contain the headers, sources, and folder types. These are not related directly to synthesis of the data.
@@ -235,11 +255,13 @@ class ClassCombinerUserInterface : public QWidget
         // The following 2 contain the definitions of headers and sources
         QVector<QString> headerTypes; // Contains the type of definitions of header types
         QVector<QString> sourceTypes; // Contains the type of definitions of source types
-        QStringList headerTypesList; // Contains header types in list form
-        QStringList sourceTypesList; // Contains source types in list form
+
+        // Files that presumably have a well defined entry point
+        QVector<QVector<QString>> mainFilesAndDefinition;
 
         // State
         int stateVariable;
+        int idealState;
 };
 
 #endif // CLASSCOMBINERUSERINTERFACE
