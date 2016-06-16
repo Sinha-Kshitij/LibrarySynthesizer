@@ -18,7 +18,6 @@ class MainWindow : public QMainWindow
         ~MainWindow();
 
     private:
-        Ui::MainWindow *ui;
         ClassCombinerUserInterface *classCombinerUserInterface;
 
 };
